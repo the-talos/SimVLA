@@ -23,6 +23,23 @@ pip install tensorflow tensorflow-datasets
 
 > Important: Use `transformers>=4.57.0`.
 
+### How to run the same on Intel's XPU
+
+Inference (the LIBERO policy server) runs on an Intel GPU with the XPU build of PyTorch. Skip the `cu124` wheel and `flash-attn` above and install:
+
+```bash
+pip install torch torchvision --index-url https://download.pytorch.org/whl/xpu
+pip install "transformers>=4.57.0" num2words fastapi uvicorn json_numpy websockets msgpack_numpy safetensors einops timm opencv-python-headless
+```
+
+Then start the server from `evaluation/libero` as in the evaluation steps, with `ZE_AFFINITY_MASK=0` in place of `CUDA_VISIBLE_DEVICES=1`:
+
+```bash
+ZE_AFFINITY_MASK=0 python serve_smolvlm_libero.py --checkpoint YuankaiLuo/SimVLA-LIBERO --norm_stats ../../norm_stats/libero_norm.json --port 8102
+```
+
+The device defaults to XPU, then CUDA, then CPU. Pass `--device xpu:0`, `--device cuda:0` or `--device cpu` to choose one. The LIBERO simulator client is not run on XPU.
+
 ## Training (LIBERO Dataset)
 
 ### 1. Prepare LIBERO Dataset

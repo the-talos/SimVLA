@@ -39,6 +39,7 @@ except ImportError:
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
+from models.device import resolve_device
 from models.modeling_smolvlm_vla import SmolVLMVLA
 from models.processing_smolvlm_vla import SmolVLMVLAProcessor
 
@@ -48,7 +49,7 @@ logger = logging.getLogger(__name__)
 # Global state
 model: Optional[SmolVLMVLA] = None
 processor: Optional[SmolVLMVLAProcessor] = None
-device = "cuda" if torch.cuda.is_available() else "cpu"
+device = resolve_device()
 
 # Configuration
 CONFIG = {
@@ -59,9 +60,11 @@ CONFIG = {
 }
 
 
-def load_model(checkpoint_path: str, norm_stats_path: str = None, smolvlm_model_path: str = None):
+def load_model(checkpoint_path: str, norm_stats_path: str = None, smolvlm_model_path: str = None,
+               device_name: Optional[str] = None):
     """Load SimVLA model and processor."""
-    global model, processor
+    global model, processor, device
+    device = resolve_device(device_name)
     
     logger.info(f"Loading SimVLA from {checkpoint_path}...")
     
@@ -261,7 +264,7 @@ async def serve(host: str, port: int):
         await asyncio.Future()
 
 
-def main():
+def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="SimVLA LIBERO Server (WebSocket)")
     parser.add_argument("--checkpoint", type=str, required=True,
                         help="Path to SimVLA checkpoint")
@@ -272,13 +275,18 @@ def main():
                         help="SmolVLM model path or HuggingFace repo")
     parser.add_argument("--host", type=str, default="0.0.0.0")
     parser.add_argument("--port", type=int, default=8000)
-    
-    args = parser.parse_args()
+    parser.add_argument("--device", type=str, default=None,
+                        help="Torch device, for example xpu:0, cuda:0 or cpu (default: xpu, then cuda, then cpu)")
+    return parser
+
+
+def main():
+    args = build_parser().parse_args()
     
     if not HAS_MSGPACK:
         logger.warning("msgpack_numpy not installed! Install with: pip install msgpack-numpy")
     
-    load_model(args.checkpoint, args.norm_stats, args.smolvlm_model)
+    load_model(args.checkpoint, args.norm_stats, args.smolvlm_model, args.device)
     
     logger.info(f"Starting SimVLA server on {args.host}:{args.port}")
     logger.info(f"  Image size: {CONFIG['image_size']}x{CONFIG['image_size']}")
